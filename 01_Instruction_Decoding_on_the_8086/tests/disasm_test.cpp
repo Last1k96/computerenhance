@@ -71,26 +71,30 @@ TEST_P(DisasmTest, RoundTripBinary) {
                 getShortPathName(origBin.string()),
                 getShortPathName(src.string())
         );
-
-        std::cout << cmd << "\n";
         ASSERT_EQ(std::system(cmd.c_str()), 0)
                                     << "NASM failed on " << src;
     }
-    return;
+
     // 2) run your disassembler, capturing stdout → out.asm
     {
-        std::string cmd = "\"" + DISASM + "\" \"" +
-                          origBin.string() + "\" > \"" +
-                          outAsm.string() + "\"";
+        std::string cmd = std::format(
+                R"({} {} > {})",
+                getShortPathName(DISASM),
+                getShortPathName(origBin.string()),
+                getShortPathName(outAsm.string())
+        );
         ASSERT_EQ(std::system(cmd.c_str()), 0)
                                     << "Disassembler failed on " << origBin;
     }
 
     // 3) re-assemble the generated .asm
     {
-        std::string cmd = "\"" + NASM + "\" -f bin -o \"" +
-                          recompBin.string() + "\" \"" +
-                          outAsm.string() + "\"";
+        std::string cmd = std::format(
+                R"({} -f bin -o {} {})",
+                getShortPathName(NASM),
+                getShortPathName(recompBin.string()),
+                getShortPathName(outAsm.string())
+        );
         ASSERT_EQ(std::system(cmd.c_str()), 0)
                                     << "NASM failed on reconstructed asm";
     }
@@ -100,6 +104,7 @@ TEST_P(DisasmTest, RoundTripBinary) {
     auto b = read_bytes(recompBin);
     EXPECT_EQ(a, b) << "Binary mismatch for " << src;
 }
+
 
 INSTANTIATE_TEST_SUITE_P(
         Listings,
