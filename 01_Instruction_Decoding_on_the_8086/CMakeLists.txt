@@ -1,33 +1,62 @@
 cmake_minimum_required(VERSION 3.30)
-project(lesson_01 CXX ASM_NASM)
+project(lesson_01 LANGUAGES CXX ASM_NASM)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 enable_language(ASM_NASM)
+set(NASM ${CMAKE_ASM_NASM_COMPILER})
 
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_ASM_NASM_OBJECT_FORMAT bin)
+# ── gather *.asm files ────────────────────────────────────────────────
+file(GLOB ASM_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/listings/*.asm")
+if (NOT ASM_SOURCES)
+    message(FATAL_ERROR "No .asm files found in listings/")
+endif ()
 
-file(GLOB ASM_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/listings/*.asm")
-
-if(NOT ASM_SOURCES)
-    message(FATAL_ERROR "No .asm files found!")
-endif()
-
+# ── one custom rule per .asm ───────────────────────────────────────────
 set(ASM_BINS)
-foreach(src IN LISTS ASM_SOURCES)
+foreach (src IN LISTS ASM_SOURCES)
     get_filename_component(fname "${src}" NAME_WE)
-    set(bin "${CMAKE_CURRENT_BINARY_DIR}/${fname}.bin")
+    set(out_dir "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>")
+    set(bin "${out_dir}/${fname}.bin")
 
     add_custom_command(
-            OUTPUT  ${bin}
-            COMMAND nasm -f bin -o ${bin} ${src}
+            OUTPUT ${bin}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${out_dir}"
+            COMMAND ${NASM} -f bin -o ${bin} ${src}
             DEPENDS ${src}
             COMMENT "Assembling ${src}"
-            VERBATIM)
-
+            VERBATIM
+    )
     list(APPEND ASM_BINS ${bin})
-endforeach()
+endforeach ()
 
 add_custom_target(assemble_listings ALL DEPENDS ${ASM_BINS})
 
+# ── your disassembler executable ────────────────────────────────────────
 add_executable(lesson_01 main.cpp)
 add_dependencies(lesson_01 assemble_listings)
+
+# ── Build the GTest executable ─────────────────────────────────────────
+add_executable(disasm_tests
+        tests/disasm_test.cpp
+)
+
+# pass each DEFINE as a *single* token: NO spaces around '='
+target_compile_definitions(disasm_tests
+        PRIVATE
+        NASM_EXEC="${NASM}"
+        ASM_LISTINGS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/listings"
+        LESSON_EXE="$<TARGET_FILE:lesson_01>"
+        WORK_BASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/disasm_tests"
+)
+
+# link *only* to gtest_main (lesson_01 is invoked at runtime by your test code)
+target_link_libraries(disasm_tests
+        PRIVATE
+        gtest_main
+)
+
+# register with CTest
+add_test(NAME RoundTripDisasm COMMAND disasm_tests)
