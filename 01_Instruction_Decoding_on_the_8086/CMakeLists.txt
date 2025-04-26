@@ -38,12 +38,24 @@ add_custom_target(assemble_listings ALL DEPENDS ${ASM_BINS})
 add_executable(lesson_01 main.cpp)
 add_dependencies(lesson_01 assemble_listings)
 
-# ── Build the GTest executable ─────────────────────────────────────────
+# ── Fetch GoogleTest via FetchContent ─────────────────────────────────
+include(FetchContent)
+
+FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        main
+)
+# this both downloads and adds gtest & gmock via add_subdirectory()
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
 add_executable(disasm_tests
         tests/disasm_test.cpp
 )
 
-# pass each DEFINE as a *single* token: NO spaces around '='
+# pass each DEFINE as a single token (no spaces around '=')
 target_compile_definitions(disasm_tests
         PRIVATE
         NASM_EXEC="${NASM}"
@@ -52,11 +64,9 @@ target_compile_definitions(disasm_tests
         WORK_BASE_DIR="${CMAKE_CURRENT_BINARY_DIR}/disasm_tests"
 )
 
-# link *only* to gtest_main (lesson_01 is invoked at runtime by your test code)
 target_link_libraries(disasm_tests
         PRIVATE
         gtest_main
 )
 
-# register with CTest
 add_test(NAME RoundTripDisasm COMMAND disasm_tests)
