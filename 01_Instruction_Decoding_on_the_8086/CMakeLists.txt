@@ -55,6 +55,11 @@ add_executable(disasm_tests
         tests/disasm_test.cpp
 )
 
+add_dependencies(disasm_tests
+        lesson_01
+        assemble_listings
+)
+
 # pass each DEFINE as a single token (no spaces around '=')
 target_compile_definitions(disasm_tests
         PRIVATE

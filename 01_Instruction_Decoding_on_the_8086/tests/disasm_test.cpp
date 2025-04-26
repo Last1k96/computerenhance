@@ -52,19 +52,26 @@ static std::vector<fs::path> collect_listings() {
     return v;
 }
 
-struct DisasmTest : ::testing::TestWithParam<fs::path> {};
+// … all your includes, namespace aliases, helper functions, etc. …
 
-TEST_P(DisasmTest, RoundTripBinary) {
-    fs::path src      = GetParam();
-    fs::path workDir  = fs::path(WORK_BASE) / src.stem();
-    fs::create_directories(workDir);
+struct DisasmTest : ::testing::TestWithParam<fs::path> {
+    fs::path src;
+    fs::path workDir;
+    fs::path origBin;
+    fs::path outAsm;
+    fs::path recompBin;
 
-    fs::path origBin   = workDir / "orig.bin";
-    fs::path outAsm    = workDir / "out.asm";
-    fs::path recompBin = workDir / "recomp.bin";
+    void SetUp() override {
+        src     = GetParam();
+        workDir = fs::path(WORK_BASE) / src.stem();
+        fs::create_directories(workDir);
 
-    // 1) assemble original .asm
-    {
+        origBin   = workDir / "orig.bin";
+        outAsm    = workDir / "out.asm";
+        recompBin = workDir / "recomp.bin";
+    }
+
+    void AssembleOriginal() {
         std::string cmd = std::format(
                 R"({} -f bin -o {} {})",
                 getShortPathName(NASM),
@@ -75,8 +82,7 @@ TEST_P(DisasmTest, RoundTripBinary) {
                                     << "NASM failed on " << src;
     }
 
-    // 2) run your disassembler, capturing stdout → out.asm
-    {
+    void DisassembleOrig() {
         std::string cmd = std::format(
                 R"({} {} > {})",
                 getShortPathName(DISASM),
@@ -87,8 +93,7 @@ TEST_P(DisasmTest, RoundTripBinary) {
                                     << "Disassembler failed on " << origBin;
     }
 
-    // 3) re-assemble the generated .asm
-    {
+    void ReassembleOut() {
         std::string cmd = std::format(
                 R"({} -f bin -o {} {})",
                 getShortPathName(NASM),
@@ -98,13 +103,36 @@ TEST_P(DisasmTest, RoundTripBinary) {
         ASSERT_EQ(std::system(cmd.c_str()), 0)
                                     << "NASM failed on reconstructed asm";
     }
+};
 
-    // 4) compare binaries
+// 1) Just assembling the original .asm
+TEST_P(DisasmTest, AssembleOriginal) {
+    AssembleOriginal();
+}
+
+// 2) Disassemble the bin → out.asm
+TEST_P(DisasmTest, Disassemble) {
+    AssembleOriginal();   // ensure orig.bin exists
+    DisassembleOrig();
+}
+
+// 3) Re-assemble out.asm → recomp.bin
+TEST_P(DisasmTest, Reassemble) {
+    AssembleOriginal();
+    DisassembleOrig();
+    ReassembleOut();
+}
+
+// 4) Finally compare orig.bin vs recomp.bin
+TEST_P(DisasmTest, CompareBinaries) {
+    AssembleOriginal();
+    DisassembleOrig();
+    ReassembleOut();
+
     auto a = read_bytes(origBin);
     auto b = read_bytes(recompBin);
     EXPECT_EQ(a, b) << "Binary mismatch for " << src;
 }
-
 
 INSTANTIATE_TEST_SUITE_P(
         Listings,
