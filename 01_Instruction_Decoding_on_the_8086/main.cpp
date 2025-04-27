@@ -1,14 +1,10 @@
-#include <iostream>
-#include <random>
+#include <fmt/format.h>
+
 // https://www.computerenhance.com/p/instruction-decoding-on-the-8086
 
 int main() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    fmt::print("bits 16\n");
+    fmt::print("mov cx, bx");
 
-    int min = 1, max = 100;
-    std::uniform_int_distribution<> dist(min, max);
-
-    std::cout << dist(gen) << std::endl;
     return 0;
 }

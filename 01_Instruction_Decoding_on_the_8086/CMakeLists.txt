@@ -37,6 +37,10 @@ add_custom_target(assemble_listings ALL DEPENDS ${ASM_BINS})
 # ── your disassembler executable ────────────────────────────────────────
 add_executable(lesson_01 main.cpp)
 add_dependencies(lesson_01 assemble_listings)
+target_link_libraries(lesson_01
+        PRIVATE
+        fmt::fmt
+)
 
 # ── Fetch GoogleTest via FetchContent ─────────────────────────────────
 include(FetchContent)
@@ -44,7 +48,7 @@ include(FetchContent)
 FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        main
+        GIT_TAG main
 )
 # this both downloads and adds gtest & gmock via add_subdirectory()
 FetchContent_MakeAvailable(googletest)

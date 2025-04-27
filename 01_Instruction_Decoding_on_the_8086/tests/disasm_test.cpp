@@ -42,6 +42,16 @@ static std::vector<char> read_bytes(const fs::path& p) {
     return { std::istreambuf_iterator<char>(in), {} };
 }
 
+std::string slurp_file(const std::filesystem::path& p) {
+    std::ifstream in(p, std::ios::binary);
+    if (!in) throw std::runtime_error("Failed to open " + p.string());
+
+    // Construct string from istreambuf_iterators:
+    return { std::istreambuf_iterator<char>(in),
+             std::istreambuf_iterator<char>() };
+}
+
+
 // gather all .asm files under ASM_DIR
 static std::vector<fs::path> collect_listings() {
     std::vector<fs::path> v;
@@ -131,7 +141,9 @@ TEST_P(DisasmTest, CompareBinaries) {
 
     auto a = read_bytes(origBin);
     auto b = read_bytes(recompBin);
-    EXPECT_EQ(a, b) << "Binary mismatch for " << src;
+    auto disassembledAsm = slurp_file(outAsm);
+    auto referenceAsm = slurp_file(src);
+    EXPECT_EQ(a, b) << "Disassembled asm: \n" << disassembledAsm << "\n\nReference asm: \n" << referenceAsm << "\n";
 }
 
 INSTANTIATE_TEST_SUITE_P(
