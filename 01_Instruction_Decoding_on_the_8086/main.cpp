@@ -4,6 +4,9 @@
 #include <decompile.h>
 
 int main(int argc, char* argv[]) {
+    // disable debug logging
+    spdlog::set_level(spdlog::level::off);
+
     auto filePath = parseArgs(argc, argv);
     if (!filePath.has_value()) {
         return 1;

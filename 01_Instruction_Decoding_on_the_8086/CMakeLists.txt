@@ -62,6 +62,15 @@ target_link_libraries(lesson_01
         fmt::fmt
 )
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_link_options(lesson_01
+            PRIVATE
+            -static
+            -static-libstdc++
+            -static-libgcc
+    )
+endif()
+
 #
 # Google test
 #

@@ -82,6 +82,8 @@ struct DisasmTest : ::testing::TestWithParam<fs::path> {
         origBin = workDir / "orig.bin";
         outAsm = workDir / "out.asm";
         recompBin = workDir / "recomp.bin";
+
+        spdlog::set_level(spdlog::level::debug);
     }
 
     void AssembleOriginal() {
@@ -95,7 +97,7 @@ struct DisasmTest : ::testing::TestWithParam<fs::path> {
                                     << "NASM failed on " << src;
     }
 
-    void DisassembleOrig() {
+    void DisassembleOrigWithSource() {
         auto binaryData = readFile(origBin.string());
         auto source = decompile(binaryData);
 
@@ -103,6 +105,17 @@ struct DisasmTest : ::testing::TestWithParam<fs::path> {
         ASSERT_TRUE(ofs) << "Error: could not open file for writing: " << outAsm.string();
 
         ofs << source;
+    }
+
+    void DisassembleOrigWithBinary() {
+        std::string cmd = std::format(
+                R"({} {} > {})",
+                getShortPathName(DISASM),
+                getShortPathName(origBin.string()),
+                getShortPathName(outAsm.string())
+        );
+        ASSERT_EQ(std::system(cmd.c_str()), 0)
+                                    << "Failed to decompile the binary";
     }
 
     void ReassembleOut() {
@@ -117,28 +130,36 @@ struct DisasmTest : ::testing::TestWithParam<fs::path> {
     }
 };
 
-// 1) Just assembling the original .asm
 TEST_P(DisasmTest, AssembleOriginal) {
     AssembleOriginal();
 }
 
-// 2) Disassemble the bin → out.asm
 TEST_P(DisasmTest, Disassemble) {
     AssembleOriginal();
-    DisassembleOrig();
+    DisassembleOrigWithSource();
 }
 
-// 3) Re-assemble out.asm → recomp.bin
 TEST_P(DisasmTest, Reassemble) {
     AssembleOriginal();
-    DisassembleOrig();
+    DisassembleOrigWithSource();
     ReassembleOut();
 }
 
-// 4) Finally compare orig.bin vs recomp.bin
-TEST_P(DisasmTest, CompareBinaries) {
+TEST_P(DisasmTest, CompareBinariesDebugSource) {
     AssembleOriginal();
-    DisassembleOrig();
+    DisassembleOrigWithSource();
+    ReassembleOut();
+
+    auto a = read_bytes(origBin);
+    auto b = read_bytes(recompBin);
+    auto disassembledAsm = slurp_file(outAsm);
+    auto referenceAsm = slurp_file(src);
+    EXPECT_EQ(a, b) << "Disassembled asm: \n" << disassembledAsm << "\n\nReference asm: \n" << referenceAsm << "\n";
+}
+
+TEST_P(DisasmTest, CompareBinariesDebugApplication) {
+    AssembleOriginal();
+    DisassembleOrigWithBinary();
     ReassembleOut();
 
     auto a = read_bytes(origBin);
