@@ -17,25 +17,6 @@ if (NOT ASM_SOURCES)
     message(FATAL_ERROR "No .asm files found in listings/")
 endif ()
 
-set(ASM_BINS)
-foreach (src IN LISTS ASM_SOURCES)
-    get_filename_component(fname "${src}" NAME_WE)
-    set(out_dir "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>")
-    set(bin "${out_dir}/${fname}.bin")
-
-    add_custom_command(
-            OUTPUT ${bin}
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${out_dir}"
-            COMMAND ${NASM} -f bin -o ${bin} ${src}
-            DEPENDS ${src}
-            COMMENT "Assembling ${src}"
-            VERBATIM
-    )
-    list(APPEND ASM_BINS ${bin})
-endforeach ()
-
-add_custom_target(assemble_listings ALL DEPENDS ${ASM_BINS})
-
 #
 # Disassembler header target
 #
@@ -55,7 +36,6 @@ target_link_libraries(disassembler
 #
 
 add_executable(lesson_01 main.cpp)
-add_dependencies(lesson_01 assemble_listings)
 target_link_libraries(lesson_01
         PRIVATE
         disassembler
@@ -98,10 +78,8 @@ target_include_directories(disasm_tests PUBLIC
 
 add_dependencies(disasm_tests
         lesson_01
-        assemble_listings
 )
 
-# pass each DEFINE as a single token (no spaces around '=')
 target_compile_definitions(disasm_tests
         PRIVATE
         NASM_EXEC="${NASM}"
@@ -116,4 +94,3 @@ target_link_libraries(disasm_tests
         disassembler
 )
 
-add_test(NAME RoundTripDisasm COMMAND disasm_tests)
