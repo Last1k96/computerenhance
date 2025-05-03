@@ -55,12 +55,6 @@ target_link_libraries(disassembler
 #
 
 add_executable(lesson_01 main.cpp)
-
-target_include_directories(lesson_01 PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
-
 add_dependencies(lesson_01 assemble_listings)
 target_link_libraries(lesson_01
         PRIVATE
