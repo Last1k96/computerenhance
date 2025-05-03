@@ -5,19 +5,22 @@
 #include <vector>
 #include <string>
 #include <format>
+#include <decompile.h>
 
 #ifdef _WIN32
+
 #include <windows.h>
+
 #endif
 
 namespace fs = std::filesystem;
 
-static const std::string NASM      = NASM_EXEC;
-static const std::string ASM_DIR   = ASM_LISTINGS_DIR;
-static const std::string DISASM    = LESSON_EXE;
+static const std::string NASM = NASM_EXEC;
+static const std::string ASM_DIR = ASM_LISTINGS_DIR;
+static const std::string DISASM = LESSON_EXE;
 static const std::string WORK_BASE = WORK_BASE_DIR;
 
-std::string getShortPathName(const std::string& longPath) {
+std::string getShortPathName(const std::string &longPath) {
 #ifdef _WIN32
     // Get the required buffer size
     DWORD length = GetShortPathNameA(longPath.c_str(), NULL, 0);
@@ -30,32 +33,32 @@ std::string getShortPathName(const std::string& longPath) {
     DWORD result = GetShortPathNameA(longPath.c_str(), buffer.data(), length);
     if (result == 0) return longPath; // Error, return original
 
-    return std::string(buffer.data());
+    return buffer.data();
 #else
     return longPath; // Non-Windows, return original
 #endif
 }
 
 // helper to read a file into memory
-static std::vector<char> read_bytes(const fs::path& p) {
+static std::vector<char> read_bytes(const fs::path &p) {
     std::ifstream in(p, std::ios::binary);
-    return { std::istreambuf_iterator<char>(in), {} };
+    return {std::istreambuf_iterator<char>(in), {}};
 }
 
-std::string slurp_file(const std::filesystem::path& p) {
+std::string slurp_file(const std::filesystem::path &p) {
     std::ifstream in(p, std::ios::binary);
     if (!in) throw std::runtime_error("Failed to open " + p.string());
 
     // Construct string from istreambuf_iterators:
-    return { std::istreambuf_iterator<char>(in),
-             std::istreambuf_iterator<char>() };
+    return {std::istreambuf_iterator<char>(in),
+            std::istreambuf_iterator<char>()};
 }
 
 
 // gather all .asm files under ASM_DIR
 static std::vector<fs::path> collect_listings() {
     std::vector<fs::path> v;
-    for (auto& ent : fs::directory_iterator(ASM_DIR)) {
+    for (auto &ent: fs::directory_iterator(ASM_DIR)) {
         if (ent.path().extension() == ".asm")
             v.push_back(ent.path());
     }
@@ -72,12 +75,12 @@ struct DisasmTest : ::testing::TestWithParam<fs::path> {
     fs::path recompBin;
 
     void SetUp() override {
-        src     = GetParam();
+        src = GetParam();
         workDir = fs::path(WORK_BASE) / src.stem();
         fs::create_directories(workDir);
 
-        origBin   = workDir / "orig.bin";
-        outAsm    = workDir / "out.asm";
+        origBin = workDir / "orig.bin";
+        outAsm = workDir / "out.asm";
         recompBin = workDir / "recomp.bin";
     }
 
@@ -93,14 +96,13 @@ struct DisasmTest : ::testing::TestWithParam<fs::path> {
     }
 
     void DisassembleOrig() {
-        std::string cmd = std::format(
-                R"({} {} > {})",
-                getShortPathName(DISASM),
-                getShortPathName(origBin.string()),
-                getShortPathName(outAsm.string())
-        );
-        ASSERT_EQ(std::system(cmd.c_str()), 0)
-                                    << "Disassembler failed on " << origBin;
+        auto binaryData = readFile(origBin.string());
+        auto source = decompile(binaryData);
+
+        std::ofstream ofs(outAsm.string());
+        ASSERT_TRUE(ofs) << "Error: could not open file for writing: " << outAsm.string();
+
+        ofs << source;
     }
 
     void ReassembleOut() {
@@ -122,7 +124,7 @@ TEST_P(DisasmTest, AssembleOriginal) {
 
 // 2) Disassemble the bin → out.asm
 TEST_P(DisasmTest, Disassemble) {
-    AssembleOriginal();   // ensure orig.bin exists
+    AssembleOriginal();
     DisassembleOrig();
 }
 

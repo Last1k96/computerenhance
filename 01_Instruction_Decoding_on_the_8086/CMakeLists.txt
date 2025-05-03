@@ -7,14 +7,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_language(ASM_NASM)
 set(NASM ${CMAKE_ASM_NASM_COMPILER})
 
-# ── gather *.asm files ────────────────────────────────────────────────
+#
+# Glob and compile the listing asm files
+#
+
 file(GLOB ASM_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/listings/*.asm")
 if (NOT ASM_SOURCES)
     message(FATAL_ERROR "No .asm files found in listings/")
 endif ()
 
-# ── one custom rule per .asm ───────────────────────────────────────────
 set(ASM_BINS)
 foreach (src IN LISTS ASM_SOURCES)
     get_filename_component(fname "${src}" NAME_WE)
@@ -34,15 +36,42 @@ endforeach ()
 
 add_custom_target(assemble_listings ALL DEPENDS ${ASM_BINS})
 
-# ── your disassembler executable ────────────────────────────────────────
+#
+# Disassembler header target
+#
+
+add_library(disassembler INTERFACE)
+target_include_directories(disassembler
+        INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_link_libraries(disassembler
+        INTERFACE
+        spdlog::spdlog
+)
+
+#
+# Disassembler executable
+#
+
 add_executable(lesson_01 main.cpp)
+
+target_include_directories(lesson_01 PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+
 add_dependencies(lesson_01 assemble_listings)
 target_link_libraries(lesson_01
         PRIVATE
+        disassembler
         fmt::fmt
 )
 
-# ── Fetch GoogleTest via FetchContent ─────────────────────────────────
+#
+# Google test
+#
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -50,13 +79,18 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG main
 )
-# this both downloads and adds gtest & gmock via add_subdirectory()
+
 FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
 add_executable(disasm_tests
         tests/disasm_test.cpp
+)
+
+target_include_directories(disasm_tests PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
 )
 
 add_dependencies(disasm_tests
@@ -76,6 +110,7 @@ target_compile_definitions(disasm_tests
 target_link_libraries(disasm_tests
         PRIVATE
         gtest_main
+        disassembler
 )
 
 add_test(NAME RoundTripDisasm COMMAND disasm_tests)
