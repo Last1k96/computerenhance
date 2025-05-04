@@ -35,8 +35,6 @@ struct InstructionDisasm : ::testing::TestWithParam<std::string> {
             return std::nullopt;
         }
 
-        spdlog::debug("Assembled {} into {}", asmPath.string(), binPath.string());
-
         std::ifstream in(binPath, std::ios::binary);
         auto data = std::vector<uint8_t>((std::istreambuf_iterator<char>(in)),
                                          std::istreambuf_iterator<char>());
@@ -46,7 +44,7 @@ struct InstructionDisasm : ::testing::TestWithParam<std::string> {
 };
 
 TEST_P(InstructionDisasm, MovInstruction) {
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);
 
     auto snippet = GetParam();
     auto src = "bits 16\n" + snippet;

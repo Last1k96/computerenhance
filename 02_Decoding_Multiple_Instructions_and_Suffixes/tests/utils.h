@@ -57,7 +57,7 @@ static bool compareAsmLines(std::string_view expected,
             std::cout << lineNo << ": "
                       << green << e << reset << '\n'
                       << lineNo << ": "
-                      << red << a << reset << "\n\n";
+                      << red << a << reset << "\n";
         }
     }
 

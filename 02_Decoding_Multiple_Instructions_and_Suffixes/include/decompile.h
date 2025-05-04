@@ -91,14 +91,29 @@ static std::string decompile(const std::vector<uint8_t> &binaryData) {
         auto byte = binaryData[i];
         spdlog::debug("byte {}: {:08b}", i, byte);
 
-        auto instructionBits = (byte >> 2);
-
-        if (instructionBits == 0b00100010) {
+        if ((byte & ~0b11) == 0b10001000) {
+            // Register/memory to/from register
             D = (byte >> 1) & 1;
             W = byte & 1;
 
             spdlog::debug("mov (D={} W={})", D, W);
             decodedInstructions.append("mov ");
+        } else if ((byte & ~0b1) == 0b11000110){
+            // Immediate to register/memory
+            spdlog::error("Immediate to register/memory MOV is not implemented");
+            break;
+        } else if ((byte & ~0b1111) == 0b10110000) {
+            // Immediate to register
+            spdlog::error("Immediate to register MOV is not implemented");
+            break;
+        } else if ((byte & ~0b1) == 0b10100000) {
+            // Memory to accumulator
+            spdlog::error("Memory to accumulator MOV is not implemented");
+            break;
+        } else if ((byte & ~0b1) == 0b10100010) {
+            // Accumulator to memory
+            spdlog::error("Accumulator to memory MOV is not implemented");
+            break;
         } else {
             spdlog::error("Failed to recognize instruction: {:08b}", byte);
             break;
