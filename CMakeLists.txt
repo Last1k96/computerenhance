@@ -17,4 +17,5 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
-add_subdirectory("01_Instruction_Decoding_on_the_8086")
+add_subdirectory(01_Instruction_Decoding_on_the_8086)
+add_subdirectory(02_Decoding_Multiple_Instructions_and_Suffixes)
