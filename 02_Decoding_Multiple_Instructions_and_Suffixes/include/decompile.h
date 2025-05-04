@@ -77,11 +77,6 @@ static std::string_view decodeRegister(uint8_t bits, bool W) {
     }
 }
 
-enum class DECODING_STATE {
-    INITIAL,
-    MOV,
-};
-
 // Follow Intel-8086 user manual, page 261, section 4-18
 static std::string decompile(const std::vector<uint8_t> &binaryData) {
     spdlog::debug("Decompiling binary: {} bytes", binaryData.size());
@@ -89,53 +84,46 @@ static std::string decompile(const std::vector<uint8_t> &binaryData) {
     std::string decodedInstructions;
     decodedInstructions.append("bits 16\n");
 
-    auto decodingState = DECODING_STATE::INITIAL;
     auto D = 0;
     auto W = 0;
 
-    for (auto [i, byte]: enumerate(binaryData)) {
+    for (int64_t i = 0; i < static_cast<int64_t>(binaryData.size()); i++) {
+        auto byte = binaryData[i];
         spdlog::debug("byte {}: {:08b}", i, byte);
 
-        switch (decodingState) {
-            case DECODING_STATE::INITIAL: {
-                auto instructionBits = (byte >> 2);
+        auto instructionBits = (byte >> 2);
 
-                if (instructionBits == 0b00100010) {
-                    decodingState = DECODING_STATE::MOV;
-                    D = (byte >> 1) & 1;
-                    W = byte & 1;
+        if (instructionBits == 0b00100010) {
+            D = (byte >> 1) & 1;
+            W = byte & 1;
 
-                    spdlog::debug("mov (D={} W={})", D, W);
-                    decodedInstructions.append("mov ");
-                    continue;
-                } else {
-                    spdlog::error("Failed to decode instruction {:08b} at {}", byte, i);
-                }
-                break;
-            }
-
-            case DECODING_STATE::MOV: {
-                auto mod = (byte >> 6);
-                auto reg = (byte >> 3) & 0b111;
-                auto rm = byte & 0b111;
-
-                assert(mod == 0b11 && "Only Register Mode is implemented");
-
-                auto reg0 = decodeRegister(reg, W);
-                auto reg1 = decodeRegister(rm, W);
-
-                if (D == 1) {
-                    std::swap(reg0, reg1); // Instruction destination specified in REG field
-                }
-
-                auto decoded = std::format("{}, {}\n", reg1, reg0);
-                spdlog::debug("{}", decoded);
-
-                decodedInstructions.append(decoded);
-                decodingState = DECODING_STATE::INITIAL;
-                break;
-            }
+            spdlog::debug("mov (D={} W={})", D, W);
+            decodedInstructions.append("mov ");
+        } else {
+            spdlog::error("Failed to recognize instruction: {:08b}", byte);
+            break;
         }
+
+        i++;
+        byte = binaryData[i];
+
+        auto mod = (byte >> 6);
+        auto reg = (byte >> 3) & 0b111;
+        auto rm = byte & 0b111;
+
+        assert(mod == 0b11 && "Only Register Mode is implemented");
+
+        auto reg0 = decodeRegister(reg, W);
+        auto reg1 = decodeRegister(rm, W);
+
+        if (D == 1) {
+            std::swap(reg0, reg1); // Instruction destination specified in REG field
+        }
+
+        auto decoded = std::format("{}, {}\n", reg1, reg0);
+        spdlog::debug("{}", decoded);
+
+        decodedInstructions.append(decoded);
     }
 
     return decodedInstructions;
