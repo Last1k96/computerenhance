@@ -51,7 +51,7 @@ static std::optional<fs::path> parseArgs(int argc, char *argv[]) {
     return input_path;
 }
 
-static std::string_view decodeRegister(uint8_t bits, bool W) {
+static std::string decodeRegister(uint8_t bits, bool W) {
     assert((bits >> 3) == 0);
 
     switch (bits) {
@@ -75,6 +75,56 @@ static std::string_view decodeRegister(uint8_t bits, bool W) {
             spdlog::error("Failed to decode register {:08b} with W flag = {}", bits, W ? "true" : "false");
             assert(false && "Failed to decode register");
     }
+}
+
+static std::string memoryModeEffectiveAddress(uint8_t rm) {
+    assert((rm >> 3) == 0);
+
+    switch (rm) {
+        case 0b000:
+            return "[bx + si]";
+        case 0b001:
+            return "[bx + di]";
+        case 0b010:
+            return "[bp + si]";
+        case 0b011:
+            return "[bp + di]";
+        case 0b100:
+            return "[si]";
+        case 0b101:
+            return "[di]";
+        case 0b110:
+            return std::to_string(rm);
+        case 0b111:
+            return "[bx]";
+    }
+
+    assert(false);
+}
+
+static std::string memoryModeEffectiveAddressWithDisplacement(uint8_t rm, uint16_t displacement) {
+    assert((rm >> 3) == 0);
+
+    switch (rm) {
+        case 0b000:
+            return displacement == 0 ? "[bx + si]" : std::format("[bx + si + {}]", displacement);
+        case 0b001:
+            return displacement == 0 ? "[bx + di]" : std::format("[bx + di + {}]", displacement);
+        case 0b010:
+            return displacement == 0 ? "[bp + si]" : std::format("[bp + si + {}]", displacement);
+        case 0b011:
+            return displacement == 0 ? "[bp + di]" : std::format("[bp + di + {}]", displacement);
+        case 0b100:
+            return displacement == 0 ? "[si]" : std::format("[si + {}]", displacement);
+        case 0b101:
+            return displacement == 0 ? "[di]" : std::format("[di + {}]", displacement);
+        case 0b110:
+            return displacement == 0 ? "[bp]" : std::format("[bp + {}]", displacement);
+        case 0b111:
+            return displacement == 0 ? "[bx]" : std::format("[bx + {}]", displacement);
+    }
+
+    assert(false);
 }
 
 // Follow Intel-8086 user manual, page 261, section 4-18
@@ -103,18 +153,68 @@ static std::string decompile(const std::vector<uint8_t> &binaryData) {
             auto mod = (byte >> 6);
             auto reg = (byte >> 3) & 0b111;
             auto rm = byte & 0b111;
-            assert(mod == 0b11 && "Only Register Mode is implemented");
+            spdlog::debug("mod={:02b}, reg={:03b}, rm={:03b}", mod, reg, rm);
 
-            auto reg0 = decodeRegister(reg, W);
-            auto reg1 = decodeRegister(rm, W);
+            if (mod == 0b11) {
+                spdlog::debug("Register mode, no displacement");
+                auto reg0 = decodeRegister(reg, W);
+                auto reg1 = decodeRegister(rm, W);
 
-            if (D == 1) {
-                std::swap(reg0, reg1); // Instruction destination specified in REG field
+                if (D == 1) {
+                    std::swap(reg0, reg1);
+                }
+
+                auto decoded = std::format("{}, {}\n", reg1, reg0);
+                spdlog::debug("{}", decoded);
+                decodedInstructions.append(decoded);
+            } else if (mod == 0b00) {
+                spdlog::debug("Memory mode, no displacement*");
+
+                auto reg0 = decodeRegister(reg, W);
+                auto src = memoryModeEffectiveAddress(rm);
+
+                if (D == 0) {
+                    std::swap(reg0, src);
+                }
+
+                spdlog::debug(std::format("{}, {}\n", reg0, src));
+                decodedInstructions.append(std::format("{}, {}\n", reg0, src));
+            } else if (mod == 0b01) {
+                spdlog::debug("Memory mode with 8bit displacement");
+
+                auto reg0 = decodeRegister(reg, W);
+
+                auto displacement = binaryData[++i];
+                spdlog::debug("byte {}: {:08b}", i, displacement);
+                auto src = memoryModeEffectiveAddressWithDisplacement(rm, displacement);
+
+                if (D == 0) {
+                    std::swap(reg0, src);
+                }
+
+                spdlog::debug(std::format("{}, {}\n", reg0, src));
+                decodedInstructions.append(std::format("{}, {}\n", reg0, src));
+            } else { // mod == 0b10
+                spdlog::debug("Memory mode with 16bit displacement");
+
+                auto reg0 = decodeRegister(reg, W);
+
+                auto lo = binaryData[++i];
+                spdlog::debug("byte {}: {:08b}", i, lo);
+                auto hi = binaryData[++i];
+                spdlog::debug("byte {}: {:08b}", i, hi);
+
+                auto displacement = (uint16_t{hi} << 8) | uint16_t{lo};
+                spdlog::debug("uint16 displacement {}", displacement);
+                auto src = memoryModeEffectiveAddressWithDisplacement(rm, displacement);
+
+                if (D == 0) {
+                    std::swap(reg0, src);
+                }
+
+                spdlog::debug(std::format("{}, {}\n", reg0, src));
+                decodedInstructions.append(std::format("{}, {}\n", reg0, src));
             }
-
-            auto decoded = std::format("{}, {}\n", reg1, reg0);
-            spdlog::debug("{}", decoded);
-            decodedInstructions.append(decoded);
         } else if ((byte & ~0b1) == 0b11000110) {
             spdlog::error("Immediate to register/memory MOV is not implemented");
             break;
