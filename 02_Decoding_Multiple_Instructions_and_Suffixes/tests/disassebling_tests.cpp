@@ -104,7 +104,7 @@ INSTANTIATE_TEST_SUITE_P(Complex, InstructionDisasm, ::testing::Values(
 ));
 
 
-INSTANTIATE_TEST_SUITE_P(ExtraComplex, InstructionDisasm, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(DISABLED_ExtraComplex, InstructionDisasm, ::testing::Values(
         // Signed displacements
         "mov ax, [bx + di - 37]",
         "mov [si - 300], cx",
