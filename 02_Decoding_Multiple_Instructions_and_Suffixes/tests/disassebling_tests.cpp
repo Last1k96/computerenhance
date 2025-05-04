@@ -11,7 +11,7 @@ static const std::string ASM_DIR = getShortPathName(ASM_LISTINGS_DIR);
 static const std::string DISASM = getShortPathName(LESSON_EXE);
 static const std::string WORK_BASE = getShortPathName(WORK_BASE_DIR);
 
-struct InstructionDisasm : ::testing::Test {
+struct InstructionDisasm : ::testing::TestWithParam<std::string> {
     void SetUp() override {
         spdlog::set_level(spdlog::level::debug);
     }
@@ -45,14 +45,19 @@ struct InstructionDisasm : ::testing::Test {
     }
 };
 
-TEST_F(InstructionDisasm, RegisterToRegister) {
+TEST_P(InstructionDisasm, RegisterToRegister) {
     spdlog::set_level(spdlog::level::info);
 
-    auto src = "bits 16\nmov si, bx";
+    auto snippet = GetParam();
+    auto src = "bits 16\n" + snippet;
 
     auto binary = assembleWithNasm(src);
     ASSERT_TRUE(binary.has_value());
 
     auto disassembly = decompile(binary.value());
-    ASSERT_EQ(compareAsmLines(src, disassembly), 0);
+    ASSERT_TRUE(compareAsmLines(src, disassembly));
 }
+
+INSTANTIATE_TEST_SUITE_P(MovInstructions, InstructionDisasm, ::testing::Values(
+        "mov si, bx"
+        ));
