@@ -84,34 +84,70 @@ static std::string decompile(const std::vector<uint8_t> &binaryData) {
     std::string decodedInstructions;
     decodedInstructions.append("bits 16\n");
 
-    auto D = 0;
-    auto W = 0;
-
     for (int64_t i = 0; i < static_cast<int64_t>(binaryData.size()); i++) {
         auto byte = binaryData[i];
         spdlog::debug("byte {}: {:08b}", i, byte);
 
         if ((byte & ~0b11) == 0b10001000) {
-            // Register/memory to/from register
-            D = (byte >> 1) & 1;
-            W = byte & 1;
+            spdlog::debug("MOV Register/memory to/from register");
 
+            auto D = (byte >> 1) & 1;
+            auto W = byte & 1;
             spdlog::debug("mov (D={} W={})", D, W);
             decodedInstructions.append("mov ");
-        } else if ((byte & ~0b1) == 0b11000110){
-            // Immediate to register/memory
+
+            // Read next byte
+            byte = binaryData[++i];
+            spdlog::debug("byte {}: {:08b}", i, byte);
+
+            auto mod = (byte >> 6);
+            auto reg = (byte >> 3) & 0b111;
+            auto rm = byte & 0b111;
+            assert(mod == 0b11 && "Only Register Mode is implemented");
+
+            auto reg0 = decodeRegister(reg, W);
+            auto reg1 = decodeRegister(rm, W);
+
+            if (D == 1) {
+                std::swap(reg0, reg1); // Instruction destination specified in REG field
+            }
+
+            auto decoded = std::format("{}, {}\n", reg1, reg0);
+            spdlog::debug("{}", decoded);
+            decodedInstructions.append(decoded);
+        } else if ((byte & ~0b1) == 0b11000110) {
             spdlog::error("Immediate to register/memory MOV is not implemented");
             break;
         } else if ((byte & ~0b1111) == 0b10110000) {
-            // Immediate to register
-            spdlog::error("Immediate to register MOV is not implemented");
-            break;
+            spdlog::debug("MOV Immediate to register");
+
+            auto W = (byte >> 3) & 1;
+            auto reg = (byte & 0b111);
+            auto reg0 = decodeRegister(reg, W);
+            spdlog::debug("mov (W={}, reg={})", W, reg0);
+            decodedInstructions.append(std::format("mov {}, ", reg0));
+
+            // Read next byte
+            byte = binaryData[++i];
+            spdlog::debug("byte {}: {:08b}", i, byte);
+            if (W == 0) {
+                spdlog::debug("constant uint8 value {}", byte);
+                decodedInstructions.append(std::format("{}\n", byte));
+                continue;
+            }
+
+            // Read high part of uint16 constant
+            auto lo = byte;
+            auto hi = binaryData[++i];
+            spdlog::debug("byte {}: {:08b}", i, hi);
+
+            auto constant = (uint16_t{hi} << 8) | uint16_t{lo};
+            spdlog::debug("constant uint16 value {}", constant);
+            decodedInstructions.append(std::format("{}\n", constant));
         } else if ((byte & ~0b1) == 0b10100000) {
-            // Memory to accumulator
             spdlog::error("Memory to accumulator MOV is not implemented");
             break;
         } else if ((byte & ~0b1) == 0b10100010) {
-            // Accumulator to memory
             spdlog::error("Accumulator to memory MOV is not implemented");
             break;
         } else {
@@ -119,26 +155,7 @@ static std::string decompile(const std::vector<uint8_t> &binaryData) {
             break;
         }
 
-        i++;
-        byte = binaryData[i];
 
-        auto mod = (byte >> 6);
-        auto reg = (byte >> 3) & 0b111;
-        auto rm = byte & 0b111;
-
-        assert(mod == 0b11 && "Only Register Mode is implemented");
-
-        auto reg0 = decodeRegister(reg, W);
-        auto reg1 = decodeRegister(rm, W);
-
-        if (D == 1) {
-            std::swap(reg0, reg1); // Instruction destination specified in REG field
-        }
-
-        auto decoded = std::format("{}, {}\n", reg1, reg0);
-        spdlog::debug("{}", decoded);
-
-        decodedInstructions.append(decoded);
     }
 
     return decodedInstructions;
