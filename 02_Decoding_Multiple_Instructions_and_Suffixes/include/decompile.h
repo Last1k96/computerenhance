@@ -70,7 +70,7 @@ static std::string_view decodeRegister(uint8_t bits, bool W) {
         case 0b110:
             return W ? "si" : "dh";
         case 0b111:
-            return W ? "de" : "bh";
+            return W ? "di" : "bh";
         default:
             spdlog::error("Failed to decode register {:08b} with W flag = {}", bits, W ? "true" : "false");
             assert(false && "Failed to decode register");
